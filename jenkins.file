@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_CREDS = credentials('docker-hub')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/yourrepo/devops-assistant.git'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh 'python3 -m pytest tests/ --junitxml=report.xml'
+            }
+            post {
+                always {
+                    junit 'report.xml'
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'docker build -t devops-assistant:${BUILD_NUMBER} .'
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh './deploy.sh'
+            }
+        }
+    }
+    
+    post {
+        failure {
+            emailext (
+                subject: "Pipeline Failed: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                body: "Check console output at ${env.BUILD_URL}",
+                to: 'team@example.com'
+            )
+        }
+    }
+}
